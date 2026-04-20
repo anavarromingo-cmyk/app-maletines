@@ -1,0 +1,208 @@
+LISTADO DE VERIFICACION DE MALETINES MÉDICOS
+FECHA:
+PERSONA QUE REVISA:
+REVISION:
+PROGRAMADA
+URGENTE
+EXPLORACION
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Fonendo (1U)
+Boli (1U), rotulador (1U)
+Pulsioxímetro (1U), sensor (2U) + TA
+Otoscopio (1U), conos: gruesos y finos(10Uxtamaño)
+Asas ORL (1)
+Oftalmoscopio (1U)
+Martillo reflejos (1U)
+Cinta métrica (1)
+Depresores (10U)
+Frontal (1U)
+Termómetro (1U)
+Guantes no estériles (10U)
+Mascarilla quirúrgica (5U)
+Batas desechables (2U)
+Pilas (AA, AAA, botón) (4U) CR2032
+Hidroalcohol (1U)
+RESPIRATORIO
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Cono adaptador de Oxígeno 
+Salbutamol 2.5 mg (10U)
+Salbutamol 5 mg (10U)
+Budesonida (5U)
+Nebu. ampo
+Bromuro ipratopio 250mcg (10U) ampolla
+Bromuro ipratropio 500mcg (10U)
+Salbutamol puff (1U)
+Bromuro ipratopio (Atrovent)  puff (1U)
+Budesonida puff (1U)
+Cámara administración y mascarilla (1U)
+Cánula de Yankauer (1)
+Paidocort (1 U)
+Cloruro sódico 20% 10 ml (2U)
+Sondas de aspiración 10 / 12 (1 U)
+Gafas Nasales
+Mascarilla Aerosoles
+Reservorio
+CURAS
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Paño estéril (1U)
+Gasas estériles (6U)
+Guantes estériles  6.5 (2U) ; 7 (2)
+Tapón nasal (1 U)
+Apósito transparente (1U)
+Apósito gasa (2U)
+Puntos aproximación (1U)
+Seda con aguja recta (2)
+Pinzas (1U)
+Bisturí (1U)
+Tijeras (1U)
+Esparadrapo (1U)
+Bolsas para residuos (5U)
+Lidocaína al 1% (2U)
+Sonda vesical intermitente 16 (U) y 18 (1)
+Lubricante urológico (1)
+CANALIZACIÓN VÍAS
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Compresor
+Aguja endovenoso: 22G, 24G (2Uxtamaño)
+Agujas intramuscular (4U)
+Agujas subcutánea (3U)
+Agujas porta(2U)
+Vía subcutánea (1U)
+Aguja carga (3U)
+Jeringas: 1cc, 5cc, 10cc (5Uxtamaño
+Pulverizador nasal (2U)
+Agua destilada (5U)
+Paquetes de suero (5U)
+Heparina (2U)
+Suero 50cc (2U)
+Llave de tres pasos (1)
+Alargadera (2)
+Apósitos fijación vías
+SNG núm. 8 (1U)
+Sistema de suero (2)
+Infusores (2)
+Cloruro de etilo (1)
+OFTÁLMICO
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Fluoresceína (4U)
+Hipomelosa (Acuolens) (1U)
+Tobrex (1U)
+SF 0.9% (5U)
+Lipolasic
+IMPRESOS
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Recetas Selladas
+Certificados de defunción (5U)
+Hoja Medicación (5U)
+Cuartillas papel (10U)
+Tarjetas (5U)
+OPIÁCEOS,  BENZODIACEPINAS NEUROLÉPTICOS
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Fentanilo citrato (Abstral) 100mcg (10U)
+Sulfato de morfina (Sevredol) 5mg (10U)
+Sulfato de morfina (Oramorph) 2mg/ml (1U)
+Diazepam gotas (1U)
+Diazepam 5mg (10U)
+Lorazepam (Orfidal) 1mg (5U)
+Diazepam (Stesolid)  5mg (5U)
+Diazepam (Stesolid)  10mg (5 U)
+Haloperidol gotas (1 U)
+Clorpromacina (Largactil)  gotas (1 U)
+Fentanilo (Durogesic) 12 (2 U)
+ANALGESIA, 
+CORTICOIDES, 
+PROCINÉTICOS,
+ANTIEMÉTICOS
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Ibuprofeno 400mg (5U)
+Ibuprofeno 2% (1U)
+Paracetamol 500mg (5U)
+Paracetamol gotas (1U)
+Metamizol (Metalgial) (1U)
+Dexametasona 1mg (Fortecortin) comp. (5U)
+Dexametasona 4mg (Fortecortin) comp. (5U)
+Prednisona (Dacortín) 30mg comp. (10U)
+Dexclorfeniramina (Polaramine)  2mg comp. (5U)
+Movicol pediátrico sobres (6U)
+Micralax (2U)
+Fisioenema 250 ml
+Ondansetrón (Setofilm) 4mg (10U)
+VÍA ENDOVENOSA (OPIÁCEOS, BZD, NEUROLÉPTICOS)
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Cloruro mórfico 10mg/ml (10U)
+Fentanilo 0,15mg/3ml (5U)
+Metadona 10mg/ml (5U)
+Naloxona 0,4mg (2)
+Midazolam 10m6 5mg/ml (10 U)
+Flumacenilo (Anexate) 0,5mg/5ml (2U)
+Haloperidol 5mg (5U)
+Clorpromacina Largactil 25mg/5ml (2U)
+Ketamina 500mg/10ml (1U)
+Butilbromuro de escopolamina (Buscapina)  20mg (3U)
+Atropina 1mg/ml (3U)
+Dexdor 10 mcg/ml 2ml (3 U)
+Clonidina 150 mcg/ml 1ml (5 U)
+VÍA ENDOVENOSA (VARIOS)
+CORRECTO
+FALTA
+CADUCADO
+REPUESTO
+INCIDENCIA
+Hidrocortisona (Actocortina) 100mg (3U)
+Dexametasona (Fortecortin) 4mg  IV(5U)
+Adrenalina 1mg (10U) 
+Amchafibrin 500mg (2U)
+Ceftriaxona 1g IM (2U)
+Lidocaina 1% (3U)
+Fenobarbital (Luminal) 200mg (5 U)
+Levetiracetam (Keppra) 100mg/ml (4U)
+Ácido Valproico 500mg / 5ml (Depakine) (4U)
+Omeprazol 40mg (2U)
+Dexclorfeniramina (Polaramine) 5mg (3U)
+Furosemida (Seguril) 20mg (2U)
+Diazepam (Valium) 10mg (3U)
+Ondansetrón (Zofran) 8mg (2U)
+Metamizol (Nolotil) 2g/5ml (2U)
+Prpopofol 1% vol 50ml
+FIRMA SUPERVISORA
+FIRMA MEDICO
+ PENDIENTE COMPLETAR
+FIRMA MEDICO
+FIRMA SUPERVISORA
+COMPLETO
