@@ -316,6 +316,7 @@ window.CATALOG_ENFERMERIA = [
 // Personas
 window.MEDICOS = ['Alvaro', 'Lucía', 'Verónica', 'Julia', 'Iñigo', 'Bea', 'Dorleta'];
 window.ENFERMERAS = ['Choni', 'Marta', 'Ana', 'Laura', 'Elena', 'Rocío', 'Carmen'];
+window.FARMACEUTICAS = ['Belén', 'Isabel'];
 
 // Convención de email usada por Firebase Auth y los scripts de seed.
 // Normaliza acentos y toma el primer nombre → "Cristina Moya" → "cristina@ucp.local".

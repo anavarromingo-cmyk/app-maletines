@@ -15,7 +15,7 @@ global.window = global;
 global.document = {};
 require(path.resolve(__dirname, '..', 'src', 'catalog.js'));
 
-const { MEDICOS, ENFERMERAS, emailForUser, bagIdForUser } = global;
+const { MEDICOS, ENFERMERAS, FARMACEUTICAS, emailForUser, bagIdForUser } = global;
 
 // --- Config ------------------------------------------------------------------
 
@@ -25,10 +25,12 @@ const RESET_PINS = process.argv.includes('--reset-pins');
 const PIN_DEFAULT_PORTADOR = '123456';
 const PIN_DEFAULT_CRISTINA = '000000';
 const PIN_DEFAULT_ADMIN    = '000000';
+const PIN_DEFAULT_FARMA    = '123456';
 
 function pinFor(role) {
-  if (role === 'supervisora') return PIN_DEFAULT_CRISTINA;
-  if (role === 'admin')       return PIN_DEFAULT_ADMIN;
+  if (role === 'supervisora')  return PIN_DEFAULT_CRISTINA;
+  if (role === 'admin')        return PIN_DEFAULT_ADMIN;
+  if (role === 'farmaceutico') return PIN_DEFAULT_FARMA;
   return PIN_DEFAULT_PORTADOR;
 }
 
@@ -42,6 +44,10 @@ function buildRoster() {
   ENFERMERAS.forEach((name) => roster.push({
     name, role: 'enfermera',
     bagId: bagIdForUser(name, 'enfermera'),
+    email: emailForUser(name),
+  }));
+  (FARMACEUTICAS || []).forEach((name) => roster.push({
+    name, role: 'farmaceutico', bagId: null,
     email: emailForUser(name),
   }));
   roster.push({ name: 'Cristina Moya', role: 'supervisora', bagId: null, email: emailForUser('Cristina Moya') });
@@ -104,6 +110,7 @@ async function upsertUser(u) {
   }
   console.log('\nHecho. PINs por defecto:');
   console.log(`  portadores (médicos + enfermería): ${PIN_DEFAULT_PORTADOR}`);
+  console.log(`  farmacia (Belén, Isabel):          ${PIN_DEFAULT_FARMA}`);
   console.log(`  Cristina Moya:                     ${PIN_DEFAULT_CRISTINA}`);
   console.log(`  Admin:                             ${PIN_DEFAULT_ADMIN}`);
   console.log('Cada usuario debe cambiarlo desde "¿No recuerdas el PIN?" tras el primer login.\n');

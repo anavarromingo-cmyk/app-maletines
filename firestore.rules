@@ -14,10 +14,18 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function role()          { return userData().role; }
-    function isSupervisora() { return role() == 'supervisora'; }
-    function isAdmin()       { return role() == 'admin'; }
-    function ownsBag(bagId)  { return userData().bagId == bagId; }
+    function role()           { return userData().role; }
+    function isSupervisora()  { return role() == 'supervisora'; }
+    function isAdmin()        { return role() == 'admin'; }
+    function isFarmaceutico() { return role() == 'farmaceutico'; }
+    function ownsBag(bagId)   { return userData().bagId == bagId; }
+
+    // Campos del item que farmaceutico puede tocar (vía db.replace).
+    // Si intenta modificar incidentNote u otros, la regla update lo bloquea.
+    function farmaceuticoItemWriteAllowed() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['pendingReplace', 'stock', 'expiry', 'updatedAt']);
+    }
 
     // USERS — todos los autenticados pueden leer (para listados); solo admin crea/borra.
     // El propio usuario puede actualizar su documento sin cambiar role ni bagId.
@@ -33,16 +41,20 @@ service cloud.firestore {
       );
     }
 
-    // BAGS — supervisora y admin ven todos; portador solo el suyo.
+    // BAGS — supervisora, admin y farmaceutico ven todos; portador solo el suyo.
     match /bags/{bagId} {
-      allow read:   if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
+      allow read:   if isSignedIn() && (isSupervisora() || isAdmin() || isFarmaceutico() || ownsBag(bagId));
       allow update: if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
       allow create, delete: if isSignedIn() && isAdmin();
 
       match /items/{itemId} {
-        allow read:          if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
-        allow create, update: if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
-        allow delete:        if isSignedIn() && isAdmin();
+        allow read:   if isSignedIn() && (isSupervisora() || isAdmin() || isFarmaceutico() || ownsBag(bagId));
+        allow create: if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
+        allow update: if isSignedIn() && (
+          isSupervisora() || isAdmin() || ownsBag(bagId)
+          || (isFarmaceutico() && farmaceuticoItemWriteAllowed())
+        );
+        allow delete: if isSignedIn() && isAdmin();
       }
     }
 
