@@ -658,7 +658,11 @@ body {
 
 /* Print */
 @media print {
-  .sidebar, .topbar, .tweaks-panel, .filter-bar { display: none !important; }
+  .sidebar, .topbar, .tweaks-panel, .filter-bar, .tabs, .no-print { display: none !important; }
   .app { display: block; height: auto; }
   .main { padding: 0; overflow: visible; }
+  .print-only { display: block !important; }
+  .page-head .btn { display: none !important; }
+  .panel { break-inside: avoid; page-break-inside: avoid; }
 }
+.print-only { display: none; }
