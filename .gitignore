@@ -24,3 +24,5 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+service-account.json
+scripts/service-account.json

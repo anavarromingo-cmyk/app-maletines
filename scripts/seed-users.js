@@ -7,13 +7,15 @@
 //
 // Requiere scripts/service-account.json (ver scripts/README.md).
 
-const path  = require('path');
+const path = require('path');
 const admin = require('firebase-admin');
 
-// --- Reutiliza MEDICOS/ENFERMERAS y los helpers del catálogo del cliente -----
-const window = {};
+// Shim para que catalog.js (pensado para el navegador) funcione en Node.
+global.window = global;
+global.document = {};
 require(path.resolve(__dirname, '..', 'src', 'catalog.js'));
-const { MEDICOS, ENFERMERAS, emailForUser, bagIdForUser } = window;
+
+const { MEDICOS, ENFERMERAS, emailForUser, bagIdForUser } = global;
 
 // --- Config ------------------------------------------------------------------
 
