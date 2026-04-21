@@ -1,200 +1,235 @@
-// Estado global persistente de la app
-// Almacena: usuarios, PINs, inventario por maletín, eventos de uso, reposiciones, revisiones
+// Estado global en tiempo real desde Firestore — App Maletines UCP.
+//
+// Sustituye el antiguo modelo "todo en localStorage" por suscripciones vivas a
+// Firestore vía window.db.*. Expone:
+//
+//   window.subscribeAppState(listener) → unsubscribe
+//     El listener recibe en cada cambio un objeto `state` con EXACTAMENTE la
+//     misma forma que usaba el prototipo:
+//       { users, bags, usageEvents, replaceEvents, revisionsLog, incidents,
+//         session, settings }
+//
+//   window.loadState() / saveState() / resetState()  [shims temporales]
+//     loadState devuelve un state vacío síncrono (para que App.jsx mounte
+//     antes de que llegue el primer snapshot). saveState es no-op. Se
+//     eliminan en el paso 6, cuando App.jsx migra a subscribeAppState.
+//
+//   Helpers de fecha/hora (idénticos al prototipo): getEffectiveToday,
+//   daysUntil, fmtDate, fmtDateShort, fmtTime.
 
-const STORAGE_KEY = 'maletines_app_state_v1';
+(function () {
+  const LS_OFFSET = 'maletines_sim_offset_v1';
+  const EVENT_LIMIT = 2000;
 
-function defaultPin(name) {
-  // PIN por defecto: 4 últimos dígitos basados en el nombre. Para demo.
-  // 1234 para todos por defecto. Cristina: 9999. Admin: 0000.
-  if (name === 'Cristina Moya') return '9999';
-  if (name === 'Admin') return '0000';
-  return '1234';
-}
+  // --- Offset de fecha simulada (solo demo, se queda en el navegador) -----
 
-function todayISO() { return new Date().toISOString().slice(0,10); }
-function nowISO() { return new Date().toISOString(); }
+  function getSimOffset() {
+    try { return Number(localStorage.getItem(LS_OFFSET) || 0) || 0; }
+    catch { return 0; }
+  }
+  function setSimOffset(n) {
+    try { localStorage.setItem(LS_OFFSET, String(n || 0)); } catch {}
+  }
+  window.setSimOffset = setSimOffset;
 
-function buildInventory(catalog, ownerName, kind) {
-  // Cada item arranca como "completo" con stock teórico 1, y caducidad simulada
-  // Para los que requieren caducidad, generamos fechas variadas para tener demo realista
-  const today = new Date();
-  const inv = [];
-  let idCounter = 0;
-  catalog.forEach(group => {
-    const requiresExpiry = window.EXPIRY_CATEGORIES.has(group.section);
-    group.items.forEach(name => {
-      idCounter++;
-      const id = `${kind}-${ownerName}-${idCounter}`.toLowerCase().replace(/\s+/g,'-').replace(/[^\w-]/g,'');
-      let expiry = null;
-      let status = 'ok';
-      if (requiresExpiry) {
-        // Distribuir caducidades: la mayoría >6 meses, algunas próximas, alguna caducada
-        const r = Math.random();
-        const d = new Date(today);
-        if (r < 0.04) {
-          // caducada
-          d.setDate(d.getDate() - Math.floor(Math.random()*30 + 1));
-        } else if (r < 0.12) {
-          // próxima a caducar (<=15 días)
-          d.setDate(d.getDate() + Math.floor(Math.random()*14 + 1));
-        } else if (r < 0.30) {
-          // <= 60 días
-          d.setDate(d.getDate() + Math.floor(Math.random()*45 + 16));
-        } else {
-          // > 2 meses
-          d.setDate(d.getDate() + Math.floor(Math.random()*540 + 60));
-        }
-        expiry = d.toISOString().slice(0,10);
-      }
-      inv.push({
-        id,
-        section: group.section,
-        name,
-        requiresExpiry,
-        stock: 'ok',         // ok | falta | caducado | incidencia
-        pendingReplace: 0,    // unidades pendientes de reponer
-        expiry,
-        incidentNote: '',
-      });
-    });
-  });
-  return inv;
-}
+  // --- Normalización de timestamps Firestore → ISO strings ---------------
 
-function buildInitialState() {
-  const users = [];
-  // Médicos
-  window.MEDICOS.forEach(n => users.push({
-    name: n, role: 'medico', pin: defaultPin(n),
-    bagId: `med-${n.toLowerCase()}`, bagLabel: `Maletín médico · ${n}`,
-  }));
-  // Enfermería
-  window.ENFERMERAS.forEach(n => users.push({
-    name: n, role: 'enfermera', pin: defaultPin(n),
-    bagId: `enf-${n.toLowerCase()}`, bagLabel: `Maletín enfermería · ${n}`,
-  }));
-  // Cristina
-  users.push({ name: 'Cristina Moya', role: 'supervisora', pin: defaultPin('Cristina Moya'), bagId: null, bagLabel: null });
-  // Admin
-  users.push({ name: 'Admin', role: 'admin', pin: defaultPin('Admin'), bagId: null, bagLabel: null });
+  function tsToISO(ts) {
+    if (!ts) return null;
+    if (typeof ts === 'string') return ts;
+    if (ts.toDate) return ts.toDate().toISOString();
+    if (ts instanceof Date) return ts.toISOString();
+    return null;
+  }
+  function normalizeEvent(ev) { return { ...ev, at: tsToISO(ev.at) }; }
 
-  // Inventarios por maletín
-  const bags = {};
-  window.MEDICOS.forEach(n => {
-    bags[`med-${n.toLowerCase()}`] = {
-      id: `med-${n.toLowerCase()}`,
-      type: 'medico',
-      owner: n,
-      label: `Maletín médico · ${n}`,
-      lastRevision: '2025-11-15',
-      nextRevision: '2026-05-15',
-      items: buildInventory(window.CATALOG_MEDICO, n, 'med'),
+  // --- Estado vacío con la forma que esperan los componentes --------------
+
+  function emptyState() {
+    return {
+      users: [],
+      bags: {},
+      usageEvents: [],
+      replaceEvents: [],
+      revisionsLog: [],
+      incidents: [],
+      session: null,
+      settings: { simulatedDateOffset: getSimOffset() },
     };
-  });
-  window.ENFERMERAS.forEach(n => {
-    bags[`enf-${n.toLowerCase()}`] = {
-      id: `enf-${n.toLowerCase()}`,
-      type: 'enfermera',
-      owner: n,
-      label: `Maletín enfermería · ${n}`,
-      lastRevision: '2025-12-01',
-      nextRevision: '2026-06-01',
-      items: buildInventory(window.CATALOG_ENFERMERIA, n, 'enf'),
-    };
-  });
-
-  // Genera algunos eventos de uso simulados para tener pendientes
-  const usageEvents = [];
-  const replaceEvents = [];
-  Object.values(bags).forEach(bag => {
-    // ~3-5 items pendientes de reponer por maletín
-    const sample = [...bag.items].sort(() => Math.random() - 0.5).slice(0, 3 + Math.floor(Math.random()*3));
-    sample.forEach(it => {
-      const qty = 1 + Math.floor(Math.random()*3);
-      it.pendingReplace = qty;
-      it.stock = 'falta';
-      const d = new Date();
-      d.setDate(d.getDate() - Math.floor(Math.random()*5));
-      usageEvents.push({
-        id: `u-${Math.random().toString(36).slice(2,8)}`,
-        bagId: bag.id, itemId: it.id, itemName: it.name, section: it.section,
-        qty, by: bag.owner, at: d.toISOString(), note: '',
-      });
-    });
-  });
-
-  // Algunos eventos de reposición ya realizados (historial)
-  for (let i = 0; i < 12; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - (i + 1));
-    const bagsArr = Object.values(bags);
-    const bag = bagsArr[Math.floor(Math.random()*bagsArr.length)];
-    const it = bag.items[Math.floor(Math.random()*bag.items.length)];
-    replaceEvents.push({
-      id: `r-${Math.random().toString(36).slice(2,8)}`,
-      bagId: bag.id, itemId: it.id, itemName: it.name, section: it.section,
-      qty: 1 + Math.floor(Math.random()*3),
-      by: 'Cristina Moya', at: d.toISOString(),
-      newExpiry: it.requiresExpiry ? new Date(Date.now()+365*24*3600*1000).toISOString().slice(0,10) : null,
-    });
   }
 
-  return {
-    users, bags, usageEvents, replaceEvents,
-    incidents: [],
-    revisionsLog: [],
-    session: null, // {name, role, bagId}
-    settings: { simulatedDateOffset: 0 }, // días añadidos al "hoy"
+  // --- Suscripción maestra: compone todas las subs de db.js --------------
+
+  window.subscribeAppState = function subscribeAppState(listener) {
+    if (!window.db) {
+      console.error('[state] window.db no existe. ¿Cargó src/db.js?');
+      listener(emptyState());
+      return function () {};
+    }
+
+    // Estado interno mutable
+    const S = {
+      users: [],
+      bags: {},               // { bagId: bagDoc sin items }
+      itemsByBag: {},         // { bagId: [item...] }
+      usageEvents: [],
+      replaceEvents: [],
+      revisionsLog: [],
+      session: null,
+    };
+    const subs = [];                    // unsubs de las colecciones top-level
+    const itemSubs = {};                // bagId → unsub de su subcolección items
+    let authUnsub = null;
+
+    function emit() {
+      const mergedBags = {};
+      Object.values(S.bags).forEach((bag) => {
+        mergedBags[bag.id] = {
+          ...bag,
+          items: S.itemsByBag[bag.id] || [],
+        };
+      });
+      listener({
+        users: S.users,
+        bags: mergedBags,
+        usageEvents: S.usageEvents,
+        replaceEvents: S.replaceEvents,
+        revisionsLog: S.revisionsLog,
+        incidents: [],
+        session: S.session,
+        settings: { simulatedDateOffset: getSimOffset() },
+      });
+    }
+
+    function startDataSubscriptions() {
+      if (subs.length) return; // ya arrancadas
+
+      subs.push(window.db.subscribeUsers((users) => {
+        S.users = users;
+        emit();
+      }));
+
+      subs.push(window.db.subscribeBags((bagsObj) => {
+        S.bags = bagsObj;
+        // Alta de listeners por maletín nuevo
+        Object.keys(bagsObj).forEach((bagId) => {
+          if (!itemSubs[bagId]) {
+            itemSubs[bagId] = window.db.subscribeBagItems(bagId, (items) => {
+              S.itemsByBag[bagId] = items;
+              emit();
+            });
+          }
+        });
+        // Baja de listeners si algún maletín desapareció (no debería)
+        Object.keys(itemSubs).forEach((bagId) => {
+          if (!bagsObj[bagId]) {
+            itemSubs[bagId]();
+            delete itemSubs[bagId];
+            delete S.itemsByBag[bagId];
+          }
+        });
+        emit();
+      }));
+
+      subs.push(window.db.subscribeUsageEvents((events) => {
+        S.usageEvents = events.map(normalizeEvent);
+        emit();
+      }, { limit: EVENT_LIMIT }));
+
+      subs.push(window.db.subscribeReplaceEvents((events) => {
+        S.replaceEvents = events.map(normalizeEvent);
+        emit();
+      }, { limit: EVENT_LIMIT }));
+
+      subs.push(window.db.subscribeRevisions((revs) => {
+        S.revisionsLog = revs.map(normalizeEvent);
+        emit();
+      }));
+    }
+
+    function stopDataSubscriptions() {
+      subs.forEach((u) => { try { u && u(); } catch {} });
+      subs.length = 0;
+      Object.values(itemSubs).forEach((u) => { try { u && u(); } catch {} });
+      Object.keys(itemSubs).forEach((k) => delete itemSubs[k]);
+      S.users = [];
+      S.bags = {};
+      S.itemsByBag = {};
+      S.usageEvents = [];
+      S.replaceEvents = [];
+      S.revisionsLog = [];
+    }
+
+    authUnsub = window.db.onAuthChange((profile) => {
+      if (profile && profile.role) {
+        S.session = {
+          uid: profile.uid,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role,
+          bagId: profile.bagId || null,
+          bagLabel: profile.bagId ? `Maletín · ${profile.name}` : null,
+        };
+        startDataSubscriptions();
+      } else {
+        S.session = null;
+        stopDataSubscriptions();
+      }
+      emit();
+    });
+
+    return function unsubscribe() {
+      if (authUnsub) authUnsub();
+      stopDataSubscriptions();
+    };
   };
-}
 
-window.loadState = function() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) { console.warn('load failed', e); }
-  const s = buildInitialState();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch(e){}
-  return s;
-};
+  // --- Shims temporales (se retiran en el paso 6) ------------------------
 
-window.saveState = function(s) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch(e){ console.warn(e); }
-};
+  window.loadState = function () {
+    // Esqueleto síncrono para que App.jsx pueda mountar antes del primer
+    // snapshot Firestore. El reducer real lo sustituimos en paso 6.
+    return emptyState();
+  };
+  window.saveState = function () { /* no-op: el persistente es Firestore */ };
+  window.resetState = function () {
+    // Limpia solo el offset de demo; los datos reales viven en Firestore.
+    setSimOffset(0);
+    return emptyState();
+  };
 
-window.resetState = function() {
-  localStorage.removeItem(STORAGE_KEY);
-  return window.loadState();
-};
+  // --- Helpers de fecha (idénticos al prototipo) -------------------------
 
-window.getEffectiveToday = function(state) {
-  const d = new Date();
-  d.setDate(d.getDate() + (state?.settings?.simulatedDateOffset || 0));
-  return d;
-};
+  window.getEffectiveToday = function (state) {
+    const d = new Date();
+    const offset = (state && state.settings && state.settings.simulatedDateOffset) ?? getSimOffset();
+    d.setDate(d.getDate() + (offset || 0));
+    return d;
+  };
 
-window.daysUntil = function(isoDate, state) {
-  if (!isoDate) return null;
-  const today = window.getEffectiveToday(state);
-  today.setHours(0,0,0,0);
-  const t = new Date(isoDate); t.setHours(0,0,0,0);
-  return Math.round((t - today) / (24*3600*1000));
-};
+  window.daysUntil = function (isoDate, state) {
+    if (!isoDate) return null;
+    const today = window.getEffectiveToday(state);
+    today.setHours(0, 0, 0, 0);
+    const t = new Date(isoDate); t.setHours(0, 0, 0, 0);
+    return Math.round((t - today) / (24 * 3600 * 1000));
+  };
 
-window.fmtDate = function(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+  window.fmtDate = function (iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
 
-window.fmtDateShort = function(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
-};
+  window.fmtDateShort = function (iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  };
 
-window.fmtTime = function(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-};
+  window.fmtTime = function (iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+})();
