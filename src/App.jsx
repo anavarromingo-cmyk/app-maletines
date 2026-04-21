@@ -67,6 +67,30 @@ function Sidebar({ session, page, setPage, state }) {
     );
   }
 
+  if (session.role === 'farmaceutico') {
+    const farmaItems = Object.values(state.bags).flatMap(b => (b.items || []).filter(i => window.EXPIRY_CATEGORIES.has(i.section)));
+    const prep = farmaItems.filter(i => i.pendingReplace > 0).length;
+    const exp30 = farmaItems.filter(i => i.requiresExpiry && i.expiry && window.daysUntil(i.expiry, state) <= 30).length;
+    return (
+      <div className="sidebar">
+        <div className="sidebar-section">
+          <div className="sidebar-label">Farmacia</div>
+          <div className={`nav-item ${page==='preparar'?'active':''}`} onClick={()=>setPage('preparar')}>
+            Para preparar
+            {prep > 0 && <span className="nav-count alert">{prep}</span>}
+          </div>
+          <div className={`nav-item ${page==='caducidades'?'active':''}`} onClick={()=>setPage('caducidades')}>
+            Caducidades ≤30d
+            {exp30 > 0 && <span className="nav-count warn">{exp30}</span>}
+          </div>
+          <div className={`nav-item ${page==='historial'?'active':''}`} onClick={()=>setPage('historial')}>
+            Historial mío
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (session.role === 'supervisora') {
     return (
       <div className="sidebar">
@@ -233,6 +257,7 @@ function App() {
     if (!state.session) return;
     if (state.session.role === 'supervisora') setPage('dashboard');
     else if (state.session.role === 'admin') setPage('admin');
+    else if (state.session.role === 'farmaceutico') setPage('preparar');
     else setPage('inventario');
   }, [state.session && state.session.uid]);
 
@@ -356,6 +381,8 @@ function App() {
     }
   } else if (session.role === 'admin') {
     content = <window.AdminView state={state} dispatch={dispatch} pushToast={pushToast} />;
+  } else if (session.role === 'farmaceutico') {
+    content = <window.PharmacyView state={state} session={session} page={page} setPage={setPage} dispatch={dispatch} pushToast={pushToast} />;
   }
 
   return (

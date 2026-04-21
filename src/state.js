@@ -131,10 +131,13 @@
         emit();
       }, { profile }));
 
-      subs.push(window.db.subscribeUsageEvents((events) => {
-        S.usageEvents = events.map(normalizeEvent);
-        emit();
-      }, { limit: EVENT_LIMIT, profile }));
+      // Farmaceutico no lee usageEvents (reglas lo impedirían y no los usa).
+      if (profile.role !== 'farmaceutico') {
+        subs.push(window.db.subscribeUsageEvents((events) => {
+          S.usageEvents = events.map(normalizeEvent);
+          emit();
+        }, { limit: EVENT_LIMIT, profile }));
+      }
 
       subs.push(window.db.subscribeReplaceEvents((events) => {
         S.replaceEvents = events.map(normalizeEvent);

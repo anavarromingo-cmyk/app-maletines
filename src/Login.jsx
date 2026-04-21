@@ -12,6 +12,7 @@ function buildUserRoster() {
     { name: 'Cristina Moya', role: 'supervisora' },
     ...window.MEDICOS.map((name) => ({ name, role: 'medico' })),
     ...window.ENFERMERAS.map((name) => ({ name, role: 'enfermera' })),
+    ...(window.FARMACEUTICAS || []).map((name) => ({ name, role: 'farmaceutico' })),
     { name: 'Admin', role: 'admin' },
   ];
 }
@@ -26,10 +27,11 @@ function LoginScreen({ onLogin /* vestigial: la sesión real llega por onAuthCha
   const groups = useMemo(() => {
     const all = buildUserRoster();
     return {
-      supervisora: all.filter((u) => u.role === 'supervisora'),
-      admin:       all.filter((u) => u.role === 'admin'),
-      medico:      all.filter((u) => u.role === 'medico'),
-      enfermera:   all.filter((u) => u.role === 'enfermera'),
+      supervisora:  all.filter((u) => u.role === 'supervisora'),
+      admin:        all.filter((u) => u.role === 'admin'),
+      medico:       all.filter((u) => u.role === 'medico'),
+      enfermera:    all.filter((u) => u.role === 'enfermera'),
+      farmaceutico: all.filter((u) => u.role === 'farmaceutico'),
     };
   }, []);
 
@@ -91,7 +93,13 @@ function LoginScreen({ onLogin /* vestigial: la sesión real llega por onAuthCha
   }
 
   function roleLabel(r) {
-    return { supervisora: 'Supervisora', admin: 'Admin', medico: 'Médico/a', enfermera: 'Enfermero/a' }[r];
+    return {
+      supervisora: 'Supervisora',
+      admin: 'Admin',
+      medico: 'Médico/a',
+      enfermera: 'Enfermero/a',
+      farmaceutico: 'Farmacéutico/a',
+    }[r];
   }
   function initials(name) {
     return name.split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -164,6 +172,18 @@ function LoginScreen({ onLogin /* vestigial: la sesión real llega por onAuthCha
                   <div className="role-tag">{roleLabel(u.role)}</div>
                 </button>
               ))}
+              {groups.farmaceutico.length > 0 && (
+                <>
+                  <div className="user-group-label">Farmacia</div>
+                  {groups.farmaceutico.map((u) => (
+                    <button key={u.name} className={`user-list-row role-${u.role}`} onClick={() => pickUser(u)}>
+                      <div className="avatar">{initials(u.name)}</div>
+                      <div>{u.name}</div>
+                      <div className="role-tag">{roleLabel(u.role)}</div>
+                    </button>
+                  ))}
+                </>
+              )}
               <div className="user-group-label">Administración</div>
               {groups.admin.map((u) => (
                 <button key={u.name} className={`user-list-row role-${u.role}`} onClick={() => pickUser(u)}>
