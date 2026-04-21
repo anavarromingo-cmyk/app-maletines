@@ -1,0 +1,14 @@
+{
+  "name": "app-maletines-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scripts de seed para Firebase Auth + Firestore (App Maletines UCP).",
+  "scripts": {
+    "seed:users": "node seed-users.js",
+    "seed:bags": "node seed-bags.js",
+    "seed:all": "node seed-users.js && node seed-bags.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
