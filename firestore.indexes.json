@@ -1,4 +1,13 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "usageEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "byUid", "order": "ASCENDING" },
+        { "fieldPath": "at",    "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

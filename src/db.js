@@ -213,7 +213,19 @@
     }, (err) => console.error('[db] subscribeUsers', err));
   }
 
-  function subscribeBags(cb) {
+  function subscribeBags(cb, { profile } = {}) {
+    // Portadores (medico/enfermera) sólo pueden leer su propio bag por regla
+    // (firestore.rules §bags). Una list query sobre `bags/` les fallaría con
+    // permission-denied, así que los suscribimos al doc único.
+    const isPortador = profile && (profile.role === 'medico' || profile.role === 'enfermera');
+    if (isPortador) {
+      if (!profile.bagId) { cb({}); return function () {}; }
+      return fs.doc(`bags/${profile.bagId}`).onSnapshot((snap) => {
+        const bags = {};
+        if (snap.exists) bags[snap.id] = { id: snap.id, ...snap.data() };
+        cb(bags);
+      }, (err) => console.error('[db] subscribeBags(doc)', profile.bagId, err));
+    }
     return fs.collection('bags').onSnapshot((snap) => {
       const bags = {};
       snap.forEach((d) => { bags[d.id] = { id: d.id, ...d.data() }; });
@@ -227,11 +239,16 @@
     }, (err) => console.error('[db] subscribeBagItems', bagId, err));
   }
 
-  function subscribeUsageEvents(cb, { limit = 500 } = {}) {
-    return fs.collection('usageEvents').orderBy('at', 'desc').limit(limit)
-      .onSnapshot((snap) => {
-        cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      }, (err) => console.error('[db] subscribeUsageEvents', err));
+  function subscribeUsageEvents(cb, { limit = 500, profile } = {}) {
+    // Portadores solo pueden leer events con byUid == uid (firestore.rules).
+    // Sin el where la list query falla con permission-denied.
+    const isPortador = profile && (profile.role === 'medico' || profile.role === 'enfermera');
+    let q = fs.collection('usageEvents');
+    if (isPortador) q = q.where('byUid', '==', profile.uid);
+    q = q.orderBy('at', 'desc').limit(limit);
+    return q.onSnapshot((snap) => {
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error('[db] subscribeUsageEvents', err));
   }
 
   function subscribeReplaceEvents(cb, { limit = 500 } = {}) {

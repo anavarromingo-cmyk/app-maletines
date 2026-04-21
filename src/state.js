@@ -101,7 +101,7 @@
       });
     }
 
-    function startDataSubscriptions() {
+    function startDataSubscriptions(profile) {
       if (subs.length) return; // ya arrancadas
 
       subs.push(window.db.subscribeUsers((users) => {
@@ -129,12 +129,12 @@
           }
         });
         emit();
-      }));
+      }, { profile }));
 
       subs.push(window.db.subscribeUsageEvents((events) => {
         S.usageEvents = events.map(normalizeEvent);
         emit();
-      }, { limit: EVENT_LIMIT }));
+      }, { limit: EVENT_LIMIT, profile }));
 
       subs.push(window.db.subscribeReplaceEvents((events) => {
         S.replaceEvents = events.map(normalizeEvent);
@@ -170,7 +170,7 @@
           bagId: profile.bagId || null,
           bagLabel: profile.bagId ? `Maletín · ${profile.name}` : null,
         };
-        startDataSubscriptions();
+        startDataSubscriptions(profile);
       } else {
         S.session = null;
         stopDataSubscriptions();
