@@ -1,0 +1,26 @@
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+
+# Firebase Admin SDK credentials — NUNCA subir al repo
+service-account.json
+scripts/service-account.json
+**/service-account*.json
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

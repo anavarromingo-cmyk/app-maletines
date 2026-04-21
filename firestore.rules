@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// Reglas de seguridad Firestore — App Maletines UCP Domiciliaria.
+// Modelo documentado en HANDOFF.md §2. Los events son append-only (trazabilidad clínica).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function role()          { return userData().role; }
+    function isSupervisora() { return role() == 'supervisora'; }
+    function isAdmin()       { return role() == 'admin'; }
+    function ownsBag(bagId)  { return userData().bagId == bagId; }
+
+    // USERS — todos los autenticados pueden leer (para listados); solo admin crea/borra.
+    // El propio usuario puede actualizar su documento sin cambiar role ni bagId.
+    match /users/{uid} {
+      allow read:   if isSignedIn();
+      allow create: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+      allow update: if isSignedIn() && (
+        isAdmin()
+        || (request.auth.uid == uid
+            && request.resource.data.role  == resource.data.role
+            && request.resource.data.bagId == resource.data.bagId)
+      );
+    }
+
+    // BAGS — supervisora y admin ven todos; portador solo el suyo.
+    match /bags/{bagId} {
+      allow read:   if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
+      allow update: if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
+      allow create, delete: if isSignedIn() && isAdmin();
+
+      match /items/{itemId} {
+        allow read:          if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
+        allow create, update: if isSignedIn() && (isSupervisora() || isAdmin() || ownsBag(bagId));
+        allow delete:        if isSignedIn() && isAdmin();
+      }
+    }
+
+    // USAGE EVENTS — append-only. Portador solo lee los suyos; supervisora y admin leen todos.
+    match /usageEvents/{id} {
+      allow read: if isSignedIn() && (
+        isSupervisora() || isAdmin()
+        || resource.data.byUid == request.auth.uid
+      );
+      allow create: if isSignedIn()
+                    && request.resource.data.byUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // REPLACE EVENTS — append-only. Lectura para cualquier autenticado (historial compartido).
+    match /replaceEvents/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.byUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // REVISIONS — append-only. Firmas semestrales.
+    match /revisions/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.byUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}
