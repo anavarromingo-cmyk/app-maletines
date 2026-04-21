@@ -1,94 +1,10 @@
-// App principal: shell, router por rol, reducer, tweaks
-const { useState: useState_M, useEffect: useEffect_M, useReducer: useReducer_M, useRef: useRef_M } = React;
+// App principal: shell, router por rol, dispatch → Firestore.
+// El estado llega en tiempo real vía window.subscribeAppState (src/state.js);
+// cada acción que antes mutaba el reducer ahora llama a window.db.* (src/db.js).
 
-function reducer(state, action) {
-  switch (action.type) {
-    case 'login':
-      return { ...state, session: action.session };
-    case 'logout':
-      return { ...state, session: null };
-    case 'log_usage': {
-      const bag = state.bags[action.bagId];
-      const items = bag.items.map(it => it.id === action.itemId
-        ? { ...it, pendingReplace: (it.pendingReplace || 0) + action.qty, stock: 'falta' }
-        : it);
-      const newEvent = {
-        id: `u-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
-        bagId: action.bagId, itemId: action.itemId, itemName: action.name, section: action.section,
-        qty: action.qty, by: action.by, at: new Date().toISOString(), note: '',
-      };
-      return {
-        ...state,
-        bags: { ...state.bags, [action.bagId]: { ...bag, items } },
-        usageEvents: [newEvent, ...state.usageEvents],
-      };
-    }
-    case 'replace': {
-      const bag = state.bags[action.bagId];
-      const items = bag.items.map(it => it.id === action.itemId
-        ? {
-            ...it,
-            pendingReplace: Math.max(0, (it.pendingReplace || 0) - action.qty),
-            stock: ((it.pendingReplace || 0) - action.qty) <= 0 ? 'ok' : 'falta',
-            expiry: action.newExpiry || it.expiry,
-          }
-        : it);
-      const ev = {
-        id: `r-${Date.now()}-${Math.random().toString(36).slice(2,5)}`,
-        bagId: action.bagId, itemId: action.itemId, itemName: action.itemName, section: action.section,
-        qty: action.qty, by: action.by, at: new Date().toISOString(),
-        newExpiry: action.newExpiry || null,
-      };
-      return {
-        ...state,
-        bags: { ...state.bags, [action.bagId]: { ...bag, items } },
-        replaceEvents: [ev, ...state.replaceEvents],
-      };
-    }
-    case 'set_expiry': {
-      const bag = state.bags[action.bagId];
-      const items = bag.items.map(it => it.id === action.itemId ? { ...it, expiry: action.expiry } : it);
-      return { ...state, bags: { ...state.bags, [action.bagId]: { ...bag, items } } };
-    }
-    case 'set_incident': {
-      const bag = state.bags[action.bagId];
-      const items = bag.items.map(it => it.id === action.itemId ? { ...it, incidentNote: action.note } : it);
-      return { ...state, bags: { ...state.bags, [action.bagId]: { ...bag, items } } };
-    }
-    case 'set_pin': {
-      return { ...state, users: state.users.map(u => u.name === action.name ? { ...u, pin: action.pin } : u) };
-    }
-    case 'log_revision': {
-      const bag = state.bags[action.bagId];
-      const today = new Date();
-      const next = new Date(today); next.setMonth(next.getMonth()+6);
-      const updated = {
-        ...bag,
-        lastRevision: today.toISOString().slice(0,10),
-        nextRevision: next.toISOString().slice(0,10),
-      };
-      return {
-        ...state,
-        bags: { ...state.bags, [action.bagId]: updated },
-        revisionsLog: [{
-          id: `rv-${Date.now()}`,
-          bagId: action.bagId, by: action.by, supervisor: action.supervisor,
-          at: today.toISOString(), summary: action.summary,
-        }, ...state.revisionsLog],
-      };
-    }
-    case 'set_date_offset':
-      return { ...state, settings: { ...state.settings, simulatedDateOffset: action.offset } };
-    case 'switch_role_demo':
-      return { ...state, session: action.session };
-    case 'replace_state':
-      return action.state;
-    default:
-      return state;
-  }
-}
+const { useState: useState_M, useEffect: useEffect_M, useRef: useRef_M } = React;
 
-function TopBar({ session, onLogout, onSwitch, state }) {
+function TopBar({ session, onLogout, state }) {
   const today = window.getEffectiveToday(state);
   const offset = state.settings.simulatedDateOffset;
   return (
@@ -120,13 +36,14 @@ function TopBar({ session, onLogout, onSwitch, state }) {
 
 function Sidebar({ session, page, setPage, state }) {
   const bag = session.bagId ? state.bags[session.bagId] : null;
-  const allItems = Object.values(state.bags).flatMap(b => b.items);
+  const allItems = Object.values(state.bags).flatMap(b => b.items || []);
   const pendientes = allItems.filter(i => i.pendingReplace > 0).length;
   const expSoon = allItems.filter(i => i.requiresExpiry && i.expiry && window.daysUntil(i.expiry, state) <= 15).length;
 
   if (session.role === 'medico' || session.role === 'enfermera') {
-    const myPend = bag.items.filter(i => i.pendingReplace > 0).length;
-    const myExp = bag.items.filter(i => i.requiresExpiry && i.expiry && window.daysUntil(i.expiry, state) <= 15).length;
+    const myItems = (bag && bag.items) || [];
+    const myPend = myItems.filter(i => i.pendingReplace > 0).length;
+    const myExp = myItems.filter(i => i.requiresExpiry && i.expiry && window.daysUntil(i.expiry, state) <= 15).length;
     return (
       <div className="sidebar">
         <div className="sidebar-section">
@@ -163,7 +80,7 @@ function Sidebar({ session, page, setPage, state }) {
         <div className="sidebar-section">
           <div className="sidebar-label">Maletines</div>
           {Object.values(state.bags).filter(b=>b.type==='medico').map(b => {
-            const p = b.items.filter(i => i.pendingReplace > 0).length;
+            const p = (b.items || []).filter(i => i.pendingReplace > 0).length;
             return (
               <div key={b.id} className={`nav-item ${page===`bag:${b.id}`?'active':''}`} onClick={()=>setPage(`bag:${b.id}`)}>
                 <span style={{whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>MED · {b.owner}</span>
@@ -173,7 +90,7 @@ function Sidebar({ session, page, setPage, state }) {
           })}
           <div style={{height:6}}/>
           {Object.values(state.bags).filter(b=>b.type==='enfermera').map(b => {
-            const p = b.items.filter(i => i.pendingReplace > 0).length;
+            const p = (b.items || []).filter(i => i.pendingReplace > 0).length;
             return (
               <div key={b.id} className={`nav-item ${page===`bag:${b.id}`?'active':''}`} onClick={()=>setPage(`bag:${b.id}`)}>
                 <span style={{whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>ENF · {b.owner}</span>
@@ -206,8 +123,9 @@ function Sidebar({ session, page, setPage, state }) {
 
 function BagDetailForCristina({ state, bagId, dispatch, pushToast }) {
   const bag = state.bags[bagId];
+  if (!bag) return <div className="muted" style={{padding: 24}}>Cargando maletín…</div>;
   const [search, setSearch] = useState_M('');
-  const filt = bag.items.filter(it => !search || it.name.toLowerCase().includes(search.toLowerCase()));
+  const filt = (bag.items || []).filter(it => !search || it.name.toLowerCase().includes(search.toLowerCase()));
   const sections = [];
   const m = new Map();
   filt.forEach(it => { if (!m.has(it.section)) { m.set(it.section, []); sections.push(it.section); } m.get(it.section).push(it); });
@@ -217,7 +135,7 @@ function BagDetailForCristina({ state, bagId, dispatch, pushToast }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">{bag.label}</h1>
-          <div className="page-sub">Próx. revisión <span className="mono">{window.fmtDate(bag.nextRevision)}</span> · {bag.items.length} ítems</div>
+          <div className="page-sub">Próx. revisión <span className="mono">{window.fmtDate(bag.nextRevision)}</span> · {(bag.items || []).length} ítems</div>
         </div>
       </div>
       <div className="filter-bar">
@@ -242,7 +160,7 @@ function BagDetailForCristina({ state, bagId, dispatch, pushToast }) {
                         <td>{exp && exp.cls!=='ok' ? <span className={`pill ${exp.cls}`}><span className="dot"/>{exp.label}</span> : (it.pendingReplace>0?<span className="pill danger"><span className="dot"/>Falta</span>:<span className="pill ok"><span className="dot"/>OK</span>)}</td>
                         <td className="num mono">{it.pendingReplace || ''}</td>
                         <td>
-                          {it.pendingReplace > 0 && <button className="btn sm primary" onClick={() => dispatch({ type: 'replace', bagId: bag.id, itemId: it.id, itemName: it.name, section: it.section, qty: it.pendingReplace, newExpiry: it.requiresExpiry ? new Date(Date.now()+365*24*3600*1000).toISOString().slice(0,10) : null, by: 'Cristina Moya' })}>Reponer</button>}
+                          {it.pendingReplace > 0 && <button className="btn sm primary" onClick={() => dispatch({ type: 'replace', bagId: bag.id, itemId: it.id, itemName: it.name, section: it.section, qty: it.pendingReplace, newExpiry: it.requiresExpiry ? new Date(Date.now()+365*24*3600*1000).toISOString().slice(0,10) : null })}>Reponer</button>}
                         </td>
                       </tr>
                     );
@@ -261,58 +179,41 @@ function TweaksPanel({ state, dispatch, onClose }) {
   const [open, setOpen] = useState_M(true);
   if (!open) return null;
   const offset = state.settings.simulatedDateOffset;
-  function setSession(role, name) {
-    const u = state.users.find(x => x.name === name && x.role === role);
-    if (u) dispatch({ type: 'switch_role_demo', session: u });
-  }
   return (
     <div className="tweaks-panel">
       <h4>Tweaks <button onClick={() => { setOpen(false); onClose && onClose(); }}>✕</button></h4>
       <div className="field">
-        <label>Cambiar a rol (demo)</label>
-        <select className="input" onChange={e => {
-          const v = e.target.value;
-          if (!v) return;
-          if (v === 'cristina') setSession('supervisora', 'Cristina Moya');
-          else if (v === 'admin') setSession('admin', 'Admin');
-          else {
-            const [role, name] = v.split('|');
-            setSession(role, name);
-          }
-        }} value="">
-          <option value="">— Selecciona —</option>
-          <option value="cristina">Cristina Moya (Supervisora)</option>
-          <option value="admin">Admin</option>
-          <optgroup label="Médicos">
-            {window.MEDICOS.map(n => <option key={'m'+n} value={`medico|${n}`}>{n}</option>)}
-          </optgroup>
-          <optgroup label="Enfermería">
-            {window.ENFERMERAS.map(n => <option key={'e'+n} value={`enfermera|${n}`}>{n}</option>)}
-          </optgroup>
-        </select>
-      </div>
-      <div className="field">
         <label>Adelantar el reloj (días): {offset}</label>
         <input type="range" min={-30} max={365} step={1} value={offset}
           onChange={e => dispatch({ type: 'set_date_offset', offset: parseInt(e.target.value) })} />
-        <div className="muted tiny">Para ver cómo aparecen avisos de caducidad.</div>
+        <div className="muted tiny">Para ver cómo aparecen avisos de caducidad. Solo afecta a este navegador.</div>
       </div>
       <button className="btn sm" onClick={() => dispatch({ type: 'set_date_offset', offset: 0 })}>Reset reloj</button>
+      <div className="muted tiny" style={{marginTop: 12}}>
+        Para cambiar de rol: cierra sesión y entra como otra persona.
+      </div>
     </div>
   );
 }
 
 function App() {
-  const initial = window.loadState();
-  const [state, dispatch] = useReducer_M(reducer, initial);
+  const [state, setState] = useState_M(window.loadState()); // esqueleto síncrono
   const [page, setPage] = useState_M('inventario');
   const [toasts, setToasts] = useState_M([]);
   const [showTweaks, setShowTweaks] = useState_M(false);
   const tweaksAvailableRef = useRef_M(false);
 
-  useEffect_M(() => { window.saveState(state); }, [state]);
+  // Suscripción en tiempo real al estado de Firestore
+  useEffect_M(() => {
+    if (!window.subscribeAppState) {
+      console.error('[App] window.subscribeAppState no existe. Revisa src/state.js.');
+      return;
+    }
+    const unsub = window.subscribeAppState(setState);
+    return () => { try { unsub && unsub(); } catch (_) {} };
+  }, []);
 
-  // Set up Tweaks contract with the host
+  // Contrato de Tweaks con el host
   useEffect_M(() => {
     function handler(e) {
       if (!e.data || typeof e.data !== 'object') return;
@@ -321,19 +222,19 @@ function App() {
     }
     window.addEventListener('message', handler);
     if (!tweaksAvailableRef.current) {
-      window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+      try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch (_) {}
       tweaksAvailableRef.current = true;
     }
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  // Default page when session changes
+  // Página por defecto al cambiar de sesión
   useEffect_M(() => {
     if (!state.session) return;
     if (state.session.role === 'supervisora') setPage('dashboard');
     else if (state.session.role === 'admin') setPage('admin');
     else setPage('inventario');
-  }, [state.session?.name]);
+  }, [state.session && state.session.uid]);
 
   function pushToast(message, kind='info') {
     const id = Math.random().toString(36).slice(2);
@@ -341,13 +242,101 @@ function App() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
   }
 
-  function login(user) { dispatch({ type: 'login', session: user }); }
+  // Dispatch: traduce acciones del prototipo a llamadas a window.db.
+  // Async pero con fire-and-forget: la UI se actualiza vía snapshot.
+  async function dispatch(action) {
+    try {
+      switch (action.type) {
+        case 'logout':
+          await window.db.signOut();
+          return;
+
+        case 'log_usage':
+          await window.db.logUsage({
+            bagId: action.bagId,
+            itemId: action.itemId,
+            itemName: action.name || action.itemName,
+            section: action.section,
+            qty: action.qty,
+            note: action.note || '',
+          });
+          return;
+
+        case 'replace':
+          await window.db.replace({
+            bagId: action.bagId,
+            itemId: action.itemId,
+            itemName: action.itemName,
+            section: action.section,
+            qty: action.qty,
+            newExpiry: action.newExpiry || null,
+          });
+          return;
+
+        case 'set_expiry':
+          await window.db.setExpiry({
+            bagId: action.bagId,
+            itemId: action.itemId,
+            expiry: action.expiry,
+          });
+          return;
+
+        case 'set_incident': {
+          const bag = state.bags[action.bagId];
+          const it  = bag && (bag.items || []).find(i => i.id === action.itemId);
+          await window.db.setIncident({
+            bagId: action.bagId,
+            itemId: action.itemId,
+            itemName: it ? it.name : '',
+            section:  it ? it.section : '',
+            note: action.note || '',
+          });
+          return;
+        }
+
+        case 'log_revision':
+          await window.db.logRevision({
+            bagId: action.bagId,
+            summary: action.summary || {},
+            supervisor: action.supervisor || null,
+            supervisorUid: action.supervisorUid || null,
+          });
+          return;
+
+        case 'set_pin': {
+          // La "gestión de PIN" pasa a ser un reset por email (Firebase Auth).
+          const email = window.emailForUser(action.name);
+          await window.db.sendPasswordReset(email);
+          pushToast(`Email de reset enviado a ${email}`, 'ok');
+          return;
+        }
+
+        case 'set_date_offset':
+          window.setSimOffset(action.offset);
+          setState(s => ({ ...s, settings: { ...s.settings, simulatedDateOffset: action.offset } }));
+          return;
+
+        case 'login':
+        case 'switch_role_demo':
+        case 'replace_state':
+          // No-ops: la sesión la gestiona Firebase Auth.
+          return;
+
+        default:
+          console.warn('[dispatch] acción desconocida', action && action.type);
+      }
+    } catch (e) {
+      console.error('[dispatch] error en', action && action.type, e);
+      pushToast('Error guardando en Firebase. Revisa la consola.', 'err');
+    }
+  }
+
   function logout() { dispatch({ type: 'logout' }); }
 
   if (!state.session) {
     return (
       <>
-        <window.LoginScreen state={state} onLogin={login} />
+        <window.LoginScreen />
         {showTweaks && <TweaksPanel state={state} dispatch={dispatch} />}
       </>
     );
@@ -377,7 +366,7 @@ function App() {
 
       <div className="toast-stack">
         {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.kind==='ok'?'ok':''}`}>{t.message}</div>
+          <div key={t.id} className={`toast ${t.kind==='ok'?'ok':''}${t.kind==='err'?'err':''}`}>{t.message}</div>
         ))}
       </div>
 

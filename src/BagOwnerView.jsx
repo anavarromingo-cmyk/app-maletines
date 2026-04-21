@@ -10,9 +10,13 @@ function expiryStatus(item, state) {
 }
 
 function BagOwnerView({ state, session, dispatch, pushToast }) {
-  const bag = state.bags[session.bagId];
+  // Fallback seguro mientras el primer snapshot de Firestore no ha llegado.
+  const bag = state.bags[session.bagId] || {
+    id: session.bagId, label: 'Cargando maletín…', items: [],
+    lastRevision: null, nextRevision: null, type: null, owner: '',
+  };
   const [search, setSearch] = useState_B('');
-  const [openSections, setOpenSections] = useState_B(() => new Set(bag.items.map(i => i.section)));
+  const [openSections, setOpenSections] = useState_B(() => new Set((bag.items || []).map(i => i.section)));
   const [usageBuffer, setUsageBuffer] = useState_B({}); // itemId -> qty pending to log
   const [expiryEdit, setExpiryEdit] = useState_B(null); // {itemId}
   const [incidentEdit, setIncidentEdit] = useState_B(null);

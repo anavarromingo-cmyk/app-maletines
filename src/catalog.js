@@ -316,3 +316,23 @@ window.CATALOG_ENFERMERIA = [
 // Personas
 window.MEDICOS = ['Alvaro', 'Lucía', 'Verónica', 'Julia', 'Iñigo', 'Bea', 'Dorleta'];
 window.ENFERMERAS = ['Choni', 'Marta', 'Ana', 'Laura', 'Elena', 'Rocío', 'Carmen'];
+
+// Convención de email usada por Firebase Auth y los scripts de seed.
+// Normaliza acentos y toma el primer nombre → "Cristina Moya" → "cristina@ucp.local".
+window.emailForUser = function (name) {
+  const norm = (name || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/\s+/)[0];
+  return `${norm}@ucp.local`;
+};
+
+// bagId estable por persona. Coherente con el seed de bags.
+window.bagIdForUser = function (name, role) {
+  const norm = (name || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/\s+/)[0];
+  const prefix = role === 'medico' ? 'med' : role === 'enfermera' ? 'enf' : null;
+  return prefix ? `${prefix}-${norm}` : null;
+};

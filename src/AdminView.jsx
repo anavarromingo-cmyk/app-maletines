@@ -1,24 +1,18 @@
-// Vista Admin: gestión de usuarios y catálogo
+// Vista Admin: gestión de usuarios y catálogo.
+// Gestión de PIN = envío de email de "restablecer contraseña" vía Firebase Auth.
+
 const { useState: useState_A } = React;
 
 function AdminView({ state, dispatch, pushToast }) {
   const [tab, setTab] = useState_A('usuarios');
-  const [editUser, setEditUser] = useState_A(null);
+  const [confirmUser, setConfirmUser] = useState_A(null);
 
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">Administración</h1>
-          <div className="page-sub">Usuarios, PINs y catálogo de materiales</div>
-        </div>
-        <div className="flex" style={{gap:8}}>
-          <button className="btn danger" onClick={() => {
-            if (confirm('¿Restablecer toda la app? Se perderán los datos de demo.')) {
-              window.resetState();
-              location.reload();
-            }
-          }}>Restablecer demo</button>
+          <div className="page-sub">Usuarios y catálogo de materiales</div>
         </div>
       </div>
 
@@ -29,20 +23,34 @@ function AdminView({ state, dispatch, pushToast }) {
 
       {tab === 'usuarios' && (
         <div className="panel">
-          <table className="tbl">
-            <thead><tr><th>Persona</th><th>Rol</th><th>Maletín</th><th>PIN</th><th></th></tr></thead>
-            <tbody>
-              {state.users.map(u => (
-                <tr key={u.name}>
-                  <td><strong>{u.name}</strong></td>
-                  <td><span className="pill muted">{u.role}</span></td>
-                  <td className="muted tiny">{u.bagLabel || '—'}</td>
-                  <td className="mono">••••</td>
-                  <td><button className="btn sm" onClick={() => setEditUser(u)}>Editar PIN</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {state.users.length === 0 && (
+            <div className="panel-body">
+              <div className="muted tiny">
+                No hay usuarios en Firestore. Ejecuta <span className="mono">scripts/seed-users.js</span> para darlos de alta.
+              </div>
+            </div>
+          )}
+          {state.users.length > 0 && (
+            <table className="tbl">
+              <thead><tr><th>Persona</th><th>Rol</th><th>Email</th><th>Maletín</th><th></th></tr></thead>
+              <tbody>
+                {state.users.map(u => {
+                  const bagLabel = u.bagId
+                    ? (state.bags[u.bagId] && state.bags[u.bagId].label) || u.bagId
+                    : '—';
+                  return (
+                    <tr key={u.uid || u.name}>
+                      <td><strong>{u.name}</strong>{u.active === false && <span className="pill muted" style={{marginLeft:6}}>inactivo</span>}</td>
+                      <td><span className="pill muted">{u.role}</span></td>
+                      <td className="mono tiny">{u.email || window.emailForUser(u.name)}</td>
+                      <td className="muted tiny">{bagLabel}</td>
+                      <td><button className="btn sm" onClick={() => setConfirmUser(u)}>Enviar reset</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
@@ -76,32 +84,33 @@ function AdminView({ state, dispatch, pushToast }) {
         </div>
       )}
 
-      {editUser && (
-        <PinEditModal user={editUser} onClose={() => setEditUser(null)} onSave={(pin) => {
-          dispatch({ type: 'set_pin', name: editUser.name, pin });
-          setEditUser(null);
-          pushToast(`PIN actualizado para ${editUser.name}`, 'ok');
-        }} />
+      {confirmUser && (
+        <ResetModal
+          user={confirmUser}
+          onClose={() => setConfirmUser(null)}
+          onConfirm={() => {
+            dispatch({ type: 'set_pin', name: confirmUser.name });
+            setConfirmUser(null);
+          }}
+        />
       )}
     </div>
   );
 }
 
-function PinEditModal({ user, onClose, onSave }) {
-  const [v, setV] = useState_A('');
+function ResetModal({ user, onClose, onConfirm }) {
+  const email = user.email || window.emailForUser(user.name);
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="modal-head"><h3>Cambiar PIN · {user.name}</h3><button className="btn ghost" onClick={onClose}>✕</button></div>
+        <div className="modal-head"><h3>Restablecer PIN · {user.name}</h3><button className="btn ghost" onClick={onClose}>✕</button></div>
         <div className="modal-body">
-          <div className="field">
-            <label>Nuevo PIN (4 dígitos)</label>
-            <input type="text" className="input mono" maxLength={4} pattern="[0-9]{4}" value={v} onChange={e => setV(e.target.value.replace(/\D/g,''))} />
-          </div>
+          <p style={{marginBottom: 8}}>Se enviará un email a <span className="mono">{email}</span> con un enlace para establecer un nuevo PIN.</p>
+          <div className="muted tiny">Firebase Auth gestiona el reset directamente; la app no almacena el PIN.</div>
         </div>
         <div className="modal-foot">
           <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" disabled={v.length!==4} onClick={() => onSave(v)}>Guardar</button>
+          <button className="btn primary" onClick={onConfirm}>Enviar email</button>
         </div>
       </div>
     </div>

@@ -1,13 +1,20 @@
 // Revisión semestral: checklist completo del maletín con firmas
-const { useState: useState_R } = React;
+const { useState: useState_R, useEffect: useEffect_R } = React;
 
 function RevisionView({ state, session, dispatch, pushToast, bagId }) {
-  const bag = state.bags[bagId];
-  const [checks, setChecks] = useState_R(() => {
-    const m = {};
-    bag.items.forEach(it => { m[it.id] = 'pendiente'; });
-    return m;
-  });
+  // Fallback seguro para los primeros renders antes de que llegue el snapshot.
+  const bag = state.bags[bagId] || { id: bagId, label: 'Cargando…', items: [], nextRevision: null };
+  const [checks, setChecks] = useState_R({});
+  // Inicializa el checklist cuando los ítems estén disponibles.
+  useEffect_R(() => {
+    if ((bag.items || []).length === 0) return;
+    setChecks((prev) => {
+      if (Object.keys(prev).length > 0) return prev;
+      const m = {};
+      bag.items.forEach((it) => { m[it.id] = 'pendiente'; });
+      return m;
+    });
+  }, [bag.items && bag.items.length]);
   const [signProf, setSignProf] = useState_R('');
   const [signSup, setSignSup] = useState_R('');
   const [done, setDone] = useState_R(false);
